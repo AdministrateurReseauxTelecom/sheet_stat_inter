@@ -80,6 +80,29 @@ function calcul_tab ($duree, $pdo)
 		return $tableau;
 }
 
+//Fonction qui reçois une durée sous forme de string du et récupère les données pour retourner un tableau. variable $duree (MONTH, WEEK)
+function calcul_tab_user ($duree, $pdo)
+{
+	$tableau =array();
+	
+	//Nombre d'intervention Validé par technicien
+	$sql= 	"SELECT COUNT(llx_fichinter.rowid), llx_user.lastname
+			FROM `llx_fichinter` 
+			LEFT JOIN llx_user ON llx_fichinter.fk_user_valid=llx_user.rowid
+			WHERE ((".$duree."(llx_fichinter.date_valid) >= ".$duree."(NOW()))
+			AND (YEAR(llx_fichinter.date_valid) >= YEAR(NOW()))
+			AND (llx_fichinter.fk_statut >= 1)) 
+			GROUP BY llx_user.lastname";
+	
+	foreach  ($pdo->query($sql) as $row) 
+	{
+		$ligne = array("Titre" => $row['lastname'], "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+		array_push($tableau, $ligne);				
+	}
+
+		return $tableau;	
+}
+
 //Fonction qui reçois un tableau de données, un sheet, un numéro de ligne et les 3 colonnes qui accueillent le tableau + un numéro de ligne
 function print_tab ($tableau, $sheet, $C1, $C2, $C3, $i, $durée, $titre_tableau)
 {	
@@ -87,7 +110,8 @@ function print_tab ($tableau, $sheet, $C1, $C2, $C3, $i, $durée, $titre_tableau
 	
 	//entete du premeir tableau
 	$sheet->mergeCells($C1.$i.':'.$C3.$i);		//fusion de cellules
-	$sheet->setCellValue($C1.$i, $titre_tableau);		
+	$sheet->setCellValue($C1.$i, $titre_tableau);
+	$sheet->getStyle('A1')->getAlignment()->setWrapText(true);		
 	$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
 	$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
 	$sheet->getStyle($C1.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
@@ -123,27 +147,27 @@ function print_tab ($tableau, $sheet, $C1, $C2, $C3, $i, $durée, $titre_tableau
 }
 
 
-		////guits debug
-		$test = date('w')."et W maj".date('W');
-    	//$test = "ma chaine";
-		////$arr = get_defined_vars(); //affiche toutes les variables
-		ob_start(); 
-
-		var_export($test); 
-
-		$tab_debug=ob_get_contents(); 
-		ob_end_clean(); 
-		$fichier=fopen('tes_xls.log','w'); 
-		fwrite($fichier,$tab_debug); 
-		fclose($fichier); 
-		////guits debug fin
+		
 // CREATE A NEW SPREADSHEET + POPULATE DATA
 $spreadsheet = new Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Statistiques interventions');
 
 $sheet->mergeCells('A1:F1');		//fusion de cellules
-$sheet->setCellValue('A1', "Statistiques interventions semaine n°".date('W')." ".date('Y'));
+$sheet->setCellValue('A1', "Statistiques interventions du ".date('d')."/".date('m')."/".date('Y')." (semaine n°".date('W').")");
+
+//Nombre d'intervention enregistrée
+$sql=	"SELECT COUNT(llx_fichinter.rowid) 
+		FROM llx_fichinter 
+		WHERE llx_fichinter.fk_statut = 0";
+		
+foreach  ($pdo->query($sql) as $row) 
+{
+	$res = $row['COUNT(llx_fichinter.rowid)'];
+}
+$sheet->mergeCells('A3:F3');		//fusion de cellules
+$sheet->setCellValue('A3', "Nombre total d'interventions brouillon : ".$res);
+
 
 $my_tab = calcul_tab ('WEEK', $pdo);
 print_tab ($my_tab, $sheet, 'A', 'B', 'C', 5, 'WEEK', "Interventions de la semaine");
@@ -153,6 +177,16 @@ print_tab ($my_tab, $sheet, 'E', 'F', 'G', 5, 'MONTH', "Interventions du mois");
 
 $my_tab = calcul_tab ('YEAR', $pdo);
 print_tab ($my_tab, $sheet, 'I', 'J', 'K', 5, 'YEAR', "Interventions de l'année");
+
+$sheet->getRowDimension('13')->setRowHeight(30);
+$my_tab = calcul_tab_user ('WEEK', $pdo);
+print_tab ($my_tab, $sheet, 'A', 'C', 'D', 13, 'WEEK', "Interventions validées cette semaine\npar utilisateur");
+
+$my_tab = calcul_tab_user ('MONTH', $pdo);
+print_tab ($my_tab, $sheet, 'F', 'H', 'I', 13, 'MONTH', "Interventions validées ce mois\npar utilisateur");
+
+$my_tab = calcul_tab_user ('YEAR', $pdo);
+print_tab ($my_tab, $sheet, 'K', 'M', 'N', 13, 'YEAR', "Interventions validées cette année\npar utilisateur");
 
 
 
