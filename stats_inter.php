@@ -22,208 +22,140 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 
 
-//SQL
 
-//$sql = "SELECT COUNT(llx_fichinter.rowid), REPLACE ( REPLACE (llx_fichinter.fk_statut, '3', 'Traitées'), '1', 'Validées') FROM llx_fichinter WHERE llx_fichinter.date_valid >= (NOW() - INTERVAL 1 WEEK) group by llx_fichinter.fk_statut";
+//Fonction qui reçois une durée sous forme de string du et récupère les données pour retourner un tableau. variable $duree (MONTH, WEEK)
+function calcul_tab ($duree, $pdo)
+{
+	$tableau =array();
+	
+	//Nombre d'intervention enregistrée
+	$sql=	"SELECT COUNT(llx_fichinter.rowid) 
+			FROM llx_fichinter 
+			WHERE (((".$duree." (llx_fichinter.datec)) = ( ".$duree." ( NOW())))
+			AND ((YEAR (llx_fichinter.datec)) = ( YEAR ( NOW()))))";
+			
+	foreach  ($pdo->query($sql) as $row) 
+	{
+		$res = $row['COUNT(llx_fichinter.rowid)'];
+	}
+	
+	$ligne = array("Titre" => "Enregistrée", "Nb" => $res);
+	array_push($tableau, $ligne);
+	
+	
+	//Nombre d'intervention par statut
+	$sql=	"SELECT COUNT(llx_fichinter.rowid), (llx_fichinter.fk_statut) 
+			FROM llx_fichinter 
+			WHERE ((".$duree."(llx_fichinter.date_valid) >= ".$duree."(NOW()))
+					AND (YEAR(llx_fichinter.date_valid) >= YEAR(NOW()))
+					AND (llx_fichinter.fk_statut >= 1)) 
+				OR ((llx_fichinter.fk_statut = 0)
+					AND (((".$duree." (llx_fichinter.datec)) = ( ".$duree." ( NOW())))
+					AND ((YEAR (llx_fichinter.datec)) = ( YEAR ( NOW())))))
+				group by llx_fichinter.fk_statut";
+				
+	foreach  ($pdo->query($sql) as $row) 
+	{
+		switch ($row['fk_statut'])
+		{
+			case '0':
+				$ligne = array("Titre" => "Brouillon", "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+				array_push($tableau, $ligne);				
+			break;
+			case '1':
+				$ligne = array("Titre" => "Validée", "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+				array_push($tableau, $ligne);
+			break;
+			case '3':
+				$ligne = array("Titre" => "Cloturée", "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+				array_push($tableau, $ligne);
+			break;
+			case '5':
+				$ligne = array("Titre" => "Facturée", "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+				array_push($tableau, $ligne);
+			break;
+		}			
+	  }
 
-//~ $sql = "SELECT COUNT(llx_fichinter.rowid),";
-//~ $sql."REPLACE ( REPLACE (llx_fichinter.fk_statut, '3', 'Traitées'), '1', 'Validées')";
-//~ $sql."FROM llx_fichinter WHERE llx_fichinter.date_valid >= (NOW() - INTERVAL 1000 WEEK) group by llx_fichinter.fk_statut";
+		return $tableau;
+}
+
+//Fonction qui reçois un tableau de données, un sheet, un numéro de ligne et les 3 colonnes qui accueillent le tableau + un numéro de ligne
+function print_tab ($tableau, $sheet, $C1, $C2, $C3, $i, $durée, $titre_tableau)
+{	
+	$ligne = array ();
+	
+	//entete du premeir tableau
+	$sheet->mergeCells($C1.$i.':'.$C3.$i);		//fusion de cellules
+	$sheet->setCellValue($C1.$i, $titre_tableau);		
+	$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->getStyle($C1.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->getStyle($C3.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$i++;
+	$sheet->mergeCells($C1.$i.':'.$C2.$i);		//fusion de cellules
+	$sheet->setCellValue($C1.$i, "Statut");	
+	$sheet->getStyle($C1.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->getStyle($C1.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->getStyle($C1.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->getStyle($C1.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->setCellValue($C3.$i, "Nombre");	
+	$sheet->getStyle($C3.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->getStyle($C3.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->getStyle($C3.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	$sheet->getStyle($C3.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+	
+	
+	foreach ($tableau as $ligne)
+	{
+		$sheet->mergeCells($C1.$i.':'.$C2.$i);		//fusion de cellules
+		$sheet->setCellValue($C1.$i, $ligne['Titre']);
+		$sheet->setCellValue($C3.$i, $ligne['Nb']);
+		
+		//BORDER_THIN pour les traits en gras
+		$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+		$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+		$sheet->getStyle($C1.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+		$sheet->getStyle($C2.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+		$sheet->getStyle($C3.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+		$i++;
+	}
+}
 
 
+		////guits debug
+		$test = date('w')."et W maj".date('W');
+    	//$test = "ma chaine";
+		////$arr = get_defined_vars(); //affiche toutes les variables
+		ob_start(); 
 
+		var_export($test); 
 
-
-
-
-
+		$tab_debug=ob_get_contents(); 
+		ob_end_clean(); 
+		$fichier=fopen('tes_xls.log','w'); 
+		fwrite($fichier,$tab_debug); 
+		fclose($fichier); 
+		////guits debug fin
 // CREATE A NEW SPREADSHEET + POPULATE DATA
 $spreadsheet = new Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Statistiques interventions');
 
+$sheet->mergeCells('A1:F1');		//fusion de cellules
+$sheet->setCellValue('A1', "Statistiques interventions semaine n°".date('W')." ".date('Y'));
+
+$my_tab = calcul_tab ('WEEK', $pdo);
+print_tab ($my_tab, $sheet, 'A', 'B', 'C', 5, 'WEEK', "Interventions de la semaine");
+
+$my_tab = calcul_tab ('MONTH', $pdo);
+print_tab ($my_tab, $sheet, 'E', 'F', 'G', 5, 'MONTH', "Interventions du mois");
+
+$my_tab = calcul_tab ('YEAR', $pdo);
+print_tab ($my_tab, $sheet, 'I', 'J', 'K', 5, 'YEAR', "Interventions de l'année");
 
 
 
-$sql = "SELECT COUNT(llx_fichinter.rowid), (llx_fichinter.fk_statut) FROM llx_fichinter WHERE ((llx_fichinter.date_valid >= (NOW() - INTERVAL 1 WEEK)) AND (llx_fichinter.fk_statut >= 1)) OR (llx_fichinter.fk_statut = 0) group by llx_fichinter.fk_statut";
-
-//entete du premeir tableau
-$i = 4;
-$sheet->mergeCells('A'.$i.':C'.$i);		//fusion de cellules
-$sheet->setCellValue('A'.$i, "Interventions de la semaine");		
-$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('A'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('C'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$i++;
-$sheet->mergeCells('A'.$i.':B'.$i);		//fusion de cellules
-$sheet->setCellValue('A'.$i, "Statut");	
-$sheet->getStyle('A'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('A'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('A'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('A'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->setCellValue('C'.$i, "Nombre");	
-$sheet->getStyle('C'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('C'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('C'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('C'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-
-$i++;
-foreach  ($pdo->query($sql) as $row) 
-{
-	switch ($row['fk_statut'])
-	{
-		case '0':
-			$sheet->mergeCells('A'.$i.':B'.$i);		//fusion de cellules
-			$sheet->setCellValue('C'.$i, $row['COUNT(llx_fichinter.rowid)']);
-			$sheet->setCellValue('A'.$i, 'Brouillon');
-			//BORDER_THIN pour les traits en gras
-			$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('A'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('B'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('C'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			
-			
-			
-		break;
-		case '1':
-			$sheet->mergeCells('A'.$i.':B'.$i);		//fusion de cellules
-			$sheet->setCellValue('C'.$i, $row['COUNT(llx_fichinter.rowid)']);
-			$sheet->setCellValue('A'.$i, 'Validée');
-			//BORDER_THIN pour les traits en gras
-			$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('A'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('B'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('C'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			
-		break;
-		case '3':
-			$sheet->mergeCells('A'.$i.':B'.$i);		//fusion de cellules
-			$sheet->setCellValue('C'.$i, $row['COUNT(llx_fichinter.rowid)']);
-			$sheet->setCellValue('A'.$i, 'Clôturée');
-			//BORDER_THIN pour les traits en gras
-			$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('A'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('B'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('C'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			
-		break;
-		case '5':
-			$sheet->mergeCells('A'.$i.':B'.$i);		//fusion de cellules
-			$sheet->setCellValue('C'.$i, $row['COUNT(llx_fichinter.rowid)']);
-			$sheet->setCellValue('A'.$i, 'Facturée');
-			//BORDER_THIN pour les traits en gras
-			$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('A'.$i.':C'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('A'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('B'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('C'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			
-		break;
-	}
-	
-	
-	
-        //$sheet->setCellValue('A'.$i, $row['COUNT(llx_fichinter.rowid)']);
-		//$sheet->setCellValue('B'.$i, $row['fk_statut']);
-		$i++;
-    
-  }
-
-//$sql = "SELECT COUNT(llx_fichinter.rowid), (llx_fichinter.fk_statut) FROM llx_fichinter WHERE ((llx_fichinter.date_valid >= (NOW() - INTERVAL 1 month)) AND (llx_fichinter.fk_statut >= 1)) OR (llx_fichinter.fk_statut = 0) group by llx_fichinter.fk_statut";
-$sql=	"SELECT COUNT(llx_fichinter.rowid), (llx_fichinter.fk_statut) 
-		FROM llx_fichinter 
-		WHERE ((MONTH(llx_fichinter.date_valid) >= MONTH(NOW()))
-			   AND (YEAR(llx_fichinter.date_valid) >= YEAR(NOW()))
-			   AND (llx_fichinter.fk_statut >= 1)) 
-			   OR (llx_fichinter.fk_statut = 0) 
-			   group by llx_fichinter.fk_statut";
-
-//entete du deuxieme tableau
-$i = 4;
-$sheet->mergeCells('E'.$i.':G'.$i);		//fusion de cellules
-$sheet->setCellValue('E'.$i, "Interventions du mois");		
-$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('E'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('G'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$i++;
-$sheet->mergeCells('E'.$i.':F'.$i);		//fusion de cellules
-$sheet->setCellValue('E'.$i, "Statut");	
-$sheet->getStyle('E'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('E'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('E'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('E'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->setCellValue('G'.$i, "Nombre");	
-$sheet->getStyle('G'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('G'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('G'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-$sheet->getStyle('G'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-
-$i++;
-foreach  ($pdo->query($sql) as $row) 
-{
-	switch ($row['fk_statut'])
-	{
-		case '0':
-			$sheet->mergeCells('E'.$i.':F'.$i);		//fusion de cellules
-			$sheet->setCellValue('G'.$i, $row['COUNT(llx_fichinter.rowid)']);
-			$sheet->setCellValue('E'.$i, 'Brouillon');
-			//BORDER_THIN pour les traits en gras
-			$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('E'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('F'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('G'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			
-			
-			
-		break;
-		case '1':
-			$sheet->mergeCells('E'.$i.':F'.$i);		//fusion de cellules
-			$sheet->setCellValue('G'.$i, $row['COUNT(llx_fichinter.rowid)']);
-			$sheet->setCellValue('E'.$i, 'Validée');
-			//BORDER_THIN pour les traits en gras
-			$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('E'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('F'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('G'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			
-		break;
-		case '3':
-			$sheet->mergeCells('E'.$i.':F'.$i);		//fusion de cellules
-			$sheet->setCellValue('G'.$i, $row['COUNT(llx_fichinter.rowid)']);
-			$sheet->setCellValue('E'.$i, 'Clôturée');
-			//BORDER_THIN pour les traits en gras
-			$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('E'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('F'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('G'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			
-		break;
-		case '5':
-			$sheet->mergeCells('E'.$i.':F'.$i);		//fusion de cellules
-			$sheet->setCellValue('G'.$i, $row['COUNT(llx_fichinter.rowid)']);
-			$sheet->setCellValue('E'.$i, 'Facturée');
-			//BORDER_THIN pour les traits en gras
-			$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('E'.$i.':G'.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('E'.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('F'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$sheet->getStyle('G'.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			
-		break;
-	}
-	//$sheet->setCellValue('A'.$i, $row['COUNT(llx_fichinter.rowid)']);
-	//$sheet->setCellValue('B'.$i, $row['fk_statut']);
-	$i++;
-    
-  }
 
 
 // OUTPUT vesrion fichier sur disque dur
@@ -242,21 +174,6 @@ $writer->save("Stats_inter_". gmdate('D, d M Y H:i:s').".xlsx");
 
 
 
-
-
-		////guits debug
-    	
-		////$arr = get_defined_vars(); //affiche toutes les variables
-		//ob_start(); 
-
-		//var_export($row); 
-
-		//$tab_debug=ob_get_contents(); 
-		//ob_end_clean(); 
-		//$fichier=fopen('tes_xls.log','w'); 
-		//fwrite($fichier,$tab_debug); 
-		//fclose($fichier); 
-		////guits debug fin
 
 
 // OUTPUT vesrion fichier à enregistre via navigateur
