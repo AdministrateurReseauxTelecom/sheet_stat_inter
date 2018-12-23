@@ -23,10 +23,14 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 
 
-//Fonction qui reçois une durée sous forme de string du et récupère les données pour retourner un tableau. variable $duree (MONTH, WEEK)
-function calcul_tab ($duree, $pdo)
+//Fonction qui compte le nombre d'interventions par statut sur une durée sélectionnée
+//reçois la durée sous forme de string (MONTH, WEEK, YEAR)
+//recois un pdo
+function calcul_tab_inter ($duree, $pdo)
 {
 	$tableau =array();
+	$ligne = array("C1" => "Statut", "C2" => "Nombre");
+	array_push($tableau, $ligne);
 	
 	//Nombre d'intervention enregistrée
 	$sql=	"SELECT COUNT(llx_fichinter.rowid) 
@@ -39,7 +43,7 @@ function calcul_tab ($duree, $pdo)
 		$res = $row['COUNT(llx_fichinter.rowid)'];
 	}
 	
-	$ligne = array("Titre" => "Enregistrée", "Nb" => $res);
+	$ligne = array("C1" => "Enregistrée", "C2" => $res);
 	array_push($tableau, $ligne);
 	
 	
@@ -59,19 +63,19 @@ function calcul_tab ($duree, $pdo)
 		switch ($row['fk_statut'])
 		{
 			case '0':
-				$ligne = array("Titre" => "Brouillon", "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+				$ligne = array("C1" => "Brouillon", "C2" => $row['COUNT(llx_fichinter.rowid)']);
 				array_push($tableau, $ligne);				
 			break;
 			case '1':
-				$ligne = array("Titre" => "Validée", "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+				$ligne = array("C1" => "Validée", "C2" => $row['COUNT(llx_fichinter.rowid)']);
 				array_push($tableau, $ligne);
 			break;
 			case '3':
-				$ligne = array("Titre" => "Cloturée", "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+				$ligne = array("C1" => "Clôturée", "C2" => $row['COUNT(llx_fichinter.rowid)']);
 				array_push($tableau, $ligne);
 			break;
 			case '5':
-				$ligne = array("Titre" => "Facturée", "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+				$ligne = array("C1" => "Facturée", "C2" => $row['COUNT(llx_fichinter.rowid)']);
 				array_push($tableau, $ligne);
 			break;
 		}			
@@ -80,10 +84,14 @@ function calcul_tab ($duree, $pdo)
 		return $tableau;
 }
 
-//Fonction qui reçois une durée sous forme de string du et récupère les données pour retourner un tableau. variable $duree (MONTH, WEEK)
-function calcul_tab_user ($duree, $pdo)
+//Fonction qui compte le nombre d'interventions validées sur une durée sélectionnée par utilisateur
+//reçois la durée sous forme de string (MONTH, WEEK, YEAR)
+//recois un pdo
+function calcul_tab_inter_user ($duree, $pdo)
 {
 	$tableau =array();
+	$ligne = array("C1" => "Nom", "C2" => "Nombre");
+	array_push($tableau, $ligne);	
 	
 	//Nombre d'intervention Validé par technicien
 	$sql= 	"SELECT llx_user.lastname, COUNT(llx_fichinter.rowid)
@@ -96,14 +104,16 @@ function calcul_tab_user ($duree, $pdo)
 	
 	foreach  ($pdo->query($sql) as $row) 
 	{
-		$ligne = array("Titre" => $row['lastname'], "Nb" => $row['COUNT(llx_fichinter.rowid)']);
+		$ligne = array("C1" => $row['lastname'], "C2" => $row['COUNT(llx_fichinter.rowid)']);
 		array_push($tableau, $ligne);				
 	}
 
 		return $tableau;	
 }
 
-
+//Fonction qui compte les vente sur une durée sélectionnée
+//reçois la durée sous forme de string (MONTH, WEEK, YEAR)
+//recois un pdo
 function calcul_tab_vente ($duree, $pdo)
 {
 	//statut 0 brouillon 1 valider 2 signé 3 perdu 4 facturé
@@ -127,20 +137,7 @@ function calcul_tab_vente ($duree, $pdo)
 	
 	foreach  ($pdo->query($sql) as $row) 
 	{
-		//guits debug
-    	//$tt = dol_buildpath("/fichinter/card.php?id=".$object->id, 1);
-    	
-		//$arr = get_defined_vars(); //affiche toutes les variables
-		ob_start(); 
-
-		var_export($row); 
-
-		$tab_debug=ob_get_contents(); 
-		ob_end_clean(); 
-		$fichier=fopen('tes_xls.log','w'); 
-		fwrite($fichier,$tab_debug); 
-		fclose($fichier); 
-		//guits debug fin
+		
 		switch ($row['fk_statut'])
 		{
 			case '0':
@@ -170,7 +167,9 @@ function calcul_tab_vente ($duree, $pdo)
 	return $tableau;	
 }
 
-
+//Fonction qui compte les vente par utilisateur sur une durée sélectionnée
+//reçois la durée sous forme de string (MONTH, WEEK, YEAR)
+//recois un pdo
 function calcul_tab_vente_user ($duree, $pdo)
 {
 	//statut 0 brouillon 1 valider 2 signé 3 perdu 4 facturé
@@ -241,52 +240,17 @@ function calcul_tab_vente_user ($duree, $pdo)
 	return $tableau;	
 }
 
-//Fonction qui reçois un tableau de données, un sheet, un numéro de ligne et les 3 colonnes qui accueillent le tableau + un numéro de ligne
-function print_tab ($tableau, $sheet, $C1, $C2, $C3, $i, $durée, $titre_tableau)
-{	
-	$ligne = array ();
-	
-	//entete du premeir tableau
-	$sheet->mergeCells($C1.$i.':'.$C3.$i);		//fusion de cellules
-	$sheet->setCellValue($C1.$i, $titre_tableau);
-	$sheet->getStyle('A1')->getAlignment()->setWrapText(true);		
-	$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C1.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C3.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$i++;
-	$sheet->mergeCells($C1.$i.':'.$C2.$i);		//fusion de cellules
-	$sheet->setCellValue($C1.$i, "Statut");	
-	$sheet->getStyle($C1.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C1.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C1.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C1.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->setCellValue($C3.$i, "Nombre");	
-	$sheet->getStyle($C3.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C3.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C3.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C3.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	
-	
-	foreach ($tableau as $ligne)
-	{
-		$sheet->mergeCells($C1.$i.':'.$C2.$i);		//fusion de cellules
-		$sheet->setCellValue($C1.$i, $ligne['Titre']);
-		$sheet->setCellValue($C3.$i, $ligne['Nb']);
-		
-		//BORDER_THIN pour les traits en gras
-		$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-		$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-		$sheet->getStyle($C1.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-		$sheet->getStyle($C2.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-		$sheet->getStyle($C3.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-		$i++;
-	}
-}
 
 
 
-//Fonction qui reçois un tableau de données, un sheet, un numéro de ligne, la premiere colonne qui accueillent le tableau, la largeur (en nbcolonne) de la premiere colonne, le nombre de colonnes et un titre de tableau
+//Fonction qui affiche un tableau dans une feuille Excel
+//reçois un tableau de données, $tableau array [C1=>a, C2=>b, C3...)
+//un sheet, 
+//un numéro de ligne, $i int
+//la lettre de la premiere colonne qui accueillent le tableau
+//la largeur (en nbcolonne) de la premiere colonne $largeur_1 int
+//e nombre de colonnes $nbcolonne int
+//un titre de tableau $titre_tableau string
 function print_tableau ($tableau, $sheet, $C1, $i, $largeur_1, $nbcolonne, $titre_tableau)
 {	
 	$ligne = array ();
@@ -336,7 +300,9 @@ function print_tableau ($tableau, $sheet, $C1, $i, $largeur_1, $nbcolonne, $titr
 	}
 }
 
-		
+
+
+//Crétation du fichier et feuille intervention		
 // CREATE A NEW SPREADSHEET + POPULATE DATA
 $spreadsheet = new Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
@@ -357,32 +323,35 @@ foreach  ($pdo->query($sql) as $row)
 $sheet->mergeCells('A3:F3');		//fusion de cellules
 $sheet->setCellValue('A3', "Nombre total d'interventions brouillon : ".$res);
 
+$largeur_titre = 2;
+$nb_colonne = 2;
+$i = 5;
+$my_tab = calcul_tab_inter ('WEEK', $pdo);
+print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, "Interventions de la semaine");
 
-$my_tab = calcul_tab ('WEEK', $pdo);
-print_tab ($my_tab, $sheet, 'A', 'B', 'C', 5, 'WEEK', "Interventions de la semaine");
+$my_tab = calcul_tab_inter ('MONTH', $pdo);
+print_tableau ($my_tab, $sheet, 'E', $i, $largeur_titre, $nb_colonne, "Interventions du mois");
 
-$my_tab = calcul_tab ('MONTH', $pdo);
-print_tab ($my_tab, $sheet, 'E', 'F', 'G', 5, 'MONTH', "Interventions du mois");
+$my_tab = calcul_tab_inter ('YEAR', $pdo);
+print_tableau ($my_tab, $sheet, 'I', $i, $largeur_titre, $nb_colonne, "Interventions de l'année");
 
-$my_tab = calcul_tab ('YEAR', $pdo);
-print_tab ($my_tab, $sheet, 'I', 'J', 'K', 5, 'YEAR', "Interventions de l'année");
+$i = 13;
+$sheet->getRowDimension($i)->setRowHeight(30);
+$my_tab = calcul_tab_inter_user ('WEEK', $pdo);
+print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, "Interventions validées cette semaine\npar utilisateur");
 
-$sheet->getRowDimension('13')->setRowHeight(30);
-$my_tab = calcul_tab_user ('WEEK', $pdo);
-print_tab ($my_tab, $sheet, 'A', 'C', 'D', 13, 'WEEK', "Interventions validées cette semaine\npar utilisateur");
+$my_tab = calcul_tab_inter_user ('MONTH', $pdo);
+print_tableau ($my_tab, $sheet, 'F', $i, $largeur_titre, $nb_colonne, "Interventions validées ce mois\npar utilisateur");
 
-$my_tab = calcul_tab_user ('MONTH', $pdo);
-print_tab ($my_tab, $sheet, 'F', 'H', 'I', 13, 'MONTH', "Interventions validées ce mois\npar utilisateur");
-
-$my_tab = calcul_tab_user ('YEAR', $pdo);
-print_tab ($my_tab, $sheet, 'K', 'M', 'N', 13, 'YEAR', "Interventions validées cette année\npar utilisateur");
-
-
-
-
-
+$my_tab = calcul_tab_inter_user ('YEAR', $pdo);
+print_tableau ($my_tab, $sheet, 'K', $i, $largeur_titre, $nb_colonne, "Interventions validées cette année\npar utilisateur");
 
 
+
+
+
+
+//CRéation de la feuille commerce
 // CREATE A NEW SHEET + POPULATE DATA
 
 $sheet = $spreadsheet->createSheet();
@@ -410,55 +379,6 @@ print_tableau ($my_tab, $sheet, 'G', 13, 2, 4, "Ventes du mois par utilisateur")
 
 $my_tab = calcul_tab_vente_user ('YEAR', $pdo);
 print_tableau ($my_tab, $sheet, 'M', 13, 2, 4, "Ventes de l'année par utilisateur");
-//$colonne = ord ('A');
-//$colonne++;
-//$colonne = chr ($colonne);
-//$sheet->setCellValue('A3', $colonne);
-//$test_tab = array ();
-//$t = 1;
-
-//$test_tab_ligne = array ( 'C1'=>"C1_".$t, 'C2'=>"C2_".$t, 'C3'=>"C3_".$t, 'C4'=>"C4_".$t);
-//array_push($test_tab, $test_tab_ligne);
-//$t++;
-//$test_tab_ligne = array ( 'C1'=>"C1_".$t, 'C2'=>"C2_".$t, 'C3'=>"C3_".$t, 'C4'=>"C4_".$t);
-//array_push($test_tab, $test_tab_ligne);
-//$t++;
-//$test_tab_ligne = array ( 'C1'=>"C1_".$t, 'C2'=>"C2_".$t, 'C3'=>"C3_".$t, 'C4'=>"C4_".$t);
-//array_push($test_tab, $test_tab_ligne);
-//$t++;
-//$test_tab_ligne = array ( 'C1'=>"C1_".$t, 'C2'=>"C2_".$t, 'C3'=>"C3_".$t, 'C4'=>"C4_".$t);
-//array_push($test_tab, $test_tab_ligne);
-//$t++;
-//$test_tab_ligne = array ( 'C1'=>"C1_".$t, 'C2'=>"C2_".$t, 'C3'=>"C3_".$t, 'C4'=>"C4_".$t);
-//array_push($test_tab, $test_tab_ligne);
-//$t++;
-
-//print_tableau ($test_tab, $sheet, 'B', 8, 3, 4, "Interventions validées cette année\npar utilisateur");
-
-
-//SELECT u.lastname, 
-//SUM( IF( MONTH( p.date_cloture ) =1, total_ht, NULL ) ) AS janv, 
-//SUM( IF( MONTH( p.date_cloture ) =2, total_ht, NULL ) ) AS fevr, 
-//SUM( IF( MONTH( p.date_cloture ) =3, total_ht, NULL ) ) AS mars, 
-//SUM( IF( MONTH( p.date_cloture ) =4, total_ht, NULL ) ) AS avril, 
-//SUM( IF( MONTH( p.date_cloture ) =5, total_ht, NULL ) ) AS mai, 
-//SUM( IF( MONTH( p.date_cloture ) =6, total_ht, NULL ) ) AS juin, 
-//SUM( IF( MONTH( p.date_cloture ) =7, total_ht, NULL ) ) AS juill, 
-//SUM( IF( MONTH( p.date_cloture ) =8, total_ht, NULL ) ) AS aout, 
-//SUM( IF( MONTH( p.date_cloture ) =9, total_ht, NULL ) ) AS sept, 
-//SUM( IF( MONTH( p.date_cloture ) =10, total_ht, NULL ) ) AS oct, 
-//SUM( IF( MONTH( p.date_cloture ) =11, total_ht, NULL ) ) AS nov, 
-//SUM( IF( MONTH( p.date_cloture ) =12, total_ht, NULL ) ) AS dece 
-//FROM llx_user AS u, llx_propal AS p INNER JOIN llx_element_contact AS c ON p.rowid = c.element_id 
-//WHERE u.rowid =c.fk_socpeople AND p.fk_statut =2 AND year(p.date_cloture)=2017 AND c.fk_c_type_contact=31 
-//GROUP BY c.fk_socpeople
-
-
-
-
-
-
-
 
 
 
@@ -474,13 +394,6 @@ $writer = new Xlsx($spreadsheet);
 //$writer->save("Stats_inter_". gmdate('D, d M Y H:i:s').".xlsx");
 $writer->save(gmdate('Ymd')."_Stats_inter_.xlsx");
 //$writer->save("/var/www/html/dolibarrdelta/documents/ecm/rapports/".gmdate('Ymd')."_Stats_hebdo_.xlsx");
-
-
-
-
-
-
-
 
 
 
