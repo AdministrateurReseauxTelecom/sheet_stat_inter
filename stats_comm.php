@@ -665,14 +665,17 @@ function print_tableau ($tableau, $sheet, $C1, $i, $largeur_1, $nbcolonne, $titr
 
 	
 	//entete du tableau
-	$sheet->mergeCells($C1.$i.':'.$C3.$i);		//fusion de cellules
-	$sheet->setCellValue($C1.$i, $titre_tableau);
-	$sheet->getStyle('A1')->getAlignment()->setWrapText(true);		
-	$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C1.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$sheet->getStyle($C3.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-	$i++;
+	if ($titre_tableau!=NULL)
+	{
+		$sheet->mergeCells($C1.$i.':'.$C3.$i);		//fusion de cellules
+		$sheet->setCellValue($C1.$i, $titre_tableau);
+		$sheet->getStyle('A1')->getAlignment()->setWrapText(true);		
+		$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+		$sheet->getStyle($C1.$i.':'.$C3.$i)->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+		$sheet->getStyle($C1.$i)->getBorders()->getLeft()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+		$sheet->getStyle($C3.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+		$i++;
+	}
 	
 	//corps du tableau	
 	foreach ($tableau as $ligne)
@@ -712,6 +715,9 @@ $spreadsheet = new Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Liste devis validés');
 
+
+$sheet->setAutoFilter('A1:G1000');
+
 //$sheet->mergeCells('A1:F1');		//fusion de cellules
 //$sheet->setCellValue('A1', "Statistiques interventions du ".date('d')."/".date('m')."/".date('Y')." (semaine n°".date('W').")");
 
@@ -724,14 +730,17 @@ $sheet->setTitle('Liste devis validés');
 //{
 	//$res = $row['COUNT(llx_fichinter.rowid)'];
 //}
-$sheet->mergeCells('A1:F1');		//fusion de cellules
-$sheet->setCellValue('A1', "Liste des devis validés : ");
 
-$largeur_titre = 2;
+
+
+//$sheet->mergeCells('A1:F1');		//fusion de cellules
+//$sheet->setCellValue('A1', "Liste des devis validés : ");
+
+$largeur_titre = 1;
 $nb_colonne = 7;
-$i = 3;
+$i = 1;
 $my_tab = liste_devis_ouvert ($pdo);
-print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, "Liste des devis validés");
+print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, NULL);
 
 ////Crétation du fichier et feuille commerciale perdu		
 //// CREATE A NEW SPREADSHEET + POPULATE DATA
@@ -757,11 +766,11 @@ $sheet->getColumnDimension('A')->setWidth(100);		//largeur de colonne
 //$sheet->mergeCells('A1:F1');		//fusion de cellules
 //$sheet->setCellValue('A1', "Liste des devis gagnés : ");
 
-$largeur_titre = 2;
+$largeur_titre = 1;
 $nb_colonne = 8;
 $i = 1;
 $my_tab = liste_devis_gagne ('YEAR', $pdo);
-print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, "Liste des devis gagnés");
+print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, NULL);
 
 //$my_tab = calcul_tab_inter ('MONTH', $pdo);
 //print_tableau ($my_tab, $sheet, 'E', $i, $largeur_titre, $nb_colonne, "Interventions du mois");
