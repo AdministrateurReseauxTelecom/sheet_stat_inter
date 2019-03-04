@@ -28,57 +28,89 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 function liste_devis_gagne ($duree, $pdo)
 {
 	$tableau =array();
-	$ligne = array("C1" => "N° devis", "C2" => "Rèf. client", "C3" => "Client", "C4" => "Auteur", "C5" => "Date de création", "C6" => "Date de cloture", "C7" => "Montant HT", "C8" => "Type de prestation");
+	$ligne = array("C1" => "N° devis", "C2" => "Rèf. client", "C3" => "Client", "C4" => "Auteur", "C5" => "Date de création", "C6" => "Date de cloture", "C7" => "Montant HT", "C8" => "Type de prestation", "C9" => "Marge nette €", "C10" => "Marge nette %");
 	array_push($tableau, $ligne);
 	
 	//liste de devis perdus triée par datec et user, le user est l'auteur ou le commercial resp suivi
-	$sql="SELECT llx_propal.ref,
-				llx_propal.ref_client,
-				llx_societe.nom,
-				llx_user.firstname,
-				llx_user.lastname, 
-				llx_propal.datec,
-				llx_propal.date_cloture,
-				llx_propal.total_ht,
-				llx_propal_extrafields.ztypepresta
-			FROM llx_propal 
-				LEFT JOIN llx_propal_extrafields ON (llx_propal_extrafields.fk_object=llx_propal.rowid)
-				LEFT JOIN llx_societe ON (llx_societe.rowid=llx_propal.fk_soc)
-				LEFT JOIN llx_element_contact ON (llx_element_contact.element_id=llx_propal.rowid)
-				LEFT JOIN llx_user ON (llx_user.rowid=llx_element_contact.fk_socpeople)
-				WHERE ((llx_element_contact.fk_c_type_contact=31) 
-						AND llx_propal.fk_statut=2
-						AND YEAR(llx_propal.date_cloture)>=YEAR(NOW())
-						AND ".$duree."(llx_propal.date_cloture)>=".$duree."(NOW()))
-						OR
-						((llx_element_contact.fk_c_type_contact=31) 
-						AND llx_propal.fk_statut=4
-						AND YEAR(llx_propal.date_cloture)>=YEAR(NOW())
-						AND ".$duree."(llx_propal.date_cloture)>=".$duree."(NOW()))
-			UNION
-			SELECT llx_propal.ref,
-				llx_propal.ref_client,
-				llx_societe.nom,
-				llx_user.firstname,
-				llx_user.lastname, 
-				llx_propal.datec,
-				llx_propal.date_cloture,
-				llx_propal.total_ht,
-			llx_propal_extrafields.ztypepresta
-			FROM llx_propal 
-					LEFT JOIN llx_propal_extrafields ON (llx_propal_extrafields.fk_object=llx_propal.rowid) 
-					LEFT JOIN llx_user ON (llx_user.rowid=llx_propal.fk_user_author) 
-					LEFT JOIN llx_societe ON (llx_societe.rowid=llx_propal.fk_soc)
-					WHERE (llx_propal.rowid NOT IN (SELECT llx_element_contact.element_id FROM llx_element_contact WHERE llx_element_contact.fk_c_type_contact=31)
-						AND llx_propal.fk_statut=2
-						AND YEAR(llx_propal.date_cloture)=YEAR(NOW())
-						AND ".$duree."(llx_propal.date_cloture)=".$duree."(NOW()))
-						OR
-						(llx_propal.rowid NOT IN (SELECT llx_element_contact.element_id FROM llx_element_contact WHERE llx_element_contact.fk_c_type_contact=31)
-						AND llx_propal.fk_statut=4
-						AND YEAR(llx_propal.date_cloture)=YEAR(NOW())
-						AND ".$duree."(llx_propal.date_cloture)=".$duree."(NOW()))
-			ORDER BY datec desc, lastname asc";
+	$sql="SELECT DISTINCT T.ref,
+				T.ref_client,
+                T.nom,
+                T.firstname,
+                T.lastname,
+				T.datec,
+				T.date_cloture,
+				T.total_ht,
+				T.ztypepresta,
+				(SUM(T.total_det) - SUM((T.buy_price_ht * T.qty))) AS marge
+			FROM
+			(
+				SELECT llx_propal.ref,
+						llx_propal.ref_client,
+						llx_societe.nom,
+						llx_user.firstname,
+						llx_user.lastname, 
+						llx_propal.datec,
+						llx_propal.date_cloture,
+						llx_propal.total_ht,
+						llx_propal_extrafields.ztypepresta,
+						llx_propaldet.total_ht as total_det,
+						llx_propaldet.buy_price_ht,
+						llx_propaldet.qty
+					FROM llx_propal 
+						LEFT JOIN llx_propal_extrafields ON (llx_propal_extrafields.fk_object=llx_propal.rowid)
+						LEFT JOIN llx_societe ON (llx_societe.rowid=llx_propal.fk_soc)
+						LEFT JOIN llx_element_contact ON (llx_element_contact.element_id=llx_propal.rowid)
+						LEFT JOIN llx_user ON (llx_user.rowid=llx_element_contact.fk_socpeople)
+						LEFT JOIN llx_propaldet ON (llx_propaldet.fk_propal=llx_propal.rowid)
+						WHERE ((llx_element_contact.fk_c_type_contact=31) 
+								AND llx_propal.fk_statut=2
+								AND ".$duree."(llx_propal.date_cloture)>=".$duree."(NOW())
+								AND YEAR(llx_propal.date_cloture)>=YEAR(NOW()))
+								OR
+								((llx_element_contact.fk_c_type_contact=31) 
+								AND llx_propal.fk_statut=4
+								AND ".$duree."(llx_propal.date_cloture)>=".$duree."(NOW())
+								AND YEAR(llx_propal.date_cloture)>=YEAR(NOW()))
+
+				UNION
+							
+				SELECT 	llx_propal.ref,
+						llx_propal.ref_client,
+						llx_societe.nom,
+						llx_user.firstname,
+						llx_user.lastname, 
+						llx_propal.datec,
+						llx_propal.date_cloture,
+						llx_propal.total_ht,
+						llx_propal_extrafields.ztypepresta,
+						llx_propaldet.total_ht as total_det,
+						llx_propaldet.buy_price_ht,
+						llx_propaldet.qty
+					FROM llx_propal 
+							LEFT JOIN llx_propal_extrafields ON (llx_propal_extrafields.fk_object=llx_propal.rowid) 
+							LEFT JOIN llx_user ON (llx_user.rowid=llx_propal.fk_user_author) 
+							LEFT JOIN llx_societe ON (llx_societe.rowid=llx_propal.fk_soc)
+							LEFT JOIN llx_propaldet ON (llx_propaldet.fk_propal=llx_propal.rowid)
+							WHERE (llx_propal.rowid NOT IN (SELECT llx_element_contact.element_id FROM llx_element_contact WHERE llx_element_contact.fk_c_type_contact=31)
+								AND llx_propal.fk_statut=2
+								AND ".$duree."(llx_propal.date_cloture)=".$duree."(NOW())
+								AND YEAR(llx_propal.date_cloture)=YEAR(NOW()))
+								OR
+								(llx_propal.rowid NOT IN (SELECT llx_element_contact.element_id FROM llx_element_contact WHERE llx_element_contact.fk_c_type_contact=31)
+								AND llx_propal.fk_statut=4
+								AND ".$duree."(llx_propal.date_cloture)=".$duree."(NOW())
+								AND YEAR(llx_propal.date_cloture)=YEAR(NOW()))
+			) AS T
+            GROUP BY T.ref,
+				T.ref_client,
+                T.nom,
+                T.firstname,
+                T.lastname,
+				T.datec,
+				T.date_cloture,
+				T.total_ht,
+				T.ztypepresta
+            ORDER BY T.ref, T.lastname";
 			
 	
 	$num_type = array (15,14,13,12,11,10,9,8,7,6,5,4,3,2,1);
@@ -87,8 +119,14 @@ function liste_devis_gagne ($duree, $pdo)
 	foreach  ($pdo->query($sql) as $row) 
 	{
 		$type = str_replace ($num_type, $verb_type, $row['ztypepresta']);
+		$marge_tx = 0;
+		if ($row['total_ht']!=0)
+		{
+			//$marge_tx = round($row['marge'], 2)."€ soit ".round((($row['marge']/$row['total_ht'])*100),2)."%";
+			$marge_tx = round((($row['marge']/$row['total_ht'])*100),2);
+		}
 		
-		$ligne = array("C1" => $row['ref'], "C2" => $row['ref_client'], "C3" => $row['nom'], "C4" => $row['firstname']." ".$row['lastname'], "C5" => $row['datec'],"C6" => $row['date_cloture'], "C7" => $row['total_ht'], "C8" => $type);
+		$ligne = array("C1" => $row['ref'], "C2" => $row['ref_client'], "C3" => $row['nom'], "C4" => $row['firstname']." ".$row['lastname'], "C5" => $row['datec'],"C6" => $row['date_cloture'], "C7" => $row['total_ht'], "C8" => $type, "C9" => $row['marge'], "C10" => $marge_tx);
 		
 		array_push($tableau, $ligne);
 	}
@@ -153,21 +191,7 @@ function liste_devis_perdu ($duree, $pdo)
 			
 	foreach  ($pdo->query($sql) as $row) 
 	{
-		//guits debug
-    	//$tt = dol_buildpath("/fichinter/card.php?id=".$object->id, 1);
-    	
-		$arr = get_defined_vars(); //affiche toutes les variables
-		ob_start(); 
-	
-
-		var_export($row); 
-
-		$tab_debug=ob_get_contents(); 
-		ob_end_clean(); 
-		$fichier=fopen('tes_xls.log','w'); 
-		fwrite($fichier,$tab_debug); 
-		fclose($fichier); 
-		//guits debug fin
+		
 		$type = str_replace ($num_type, $verb_type, $row['ztypepresta']);
 		
 		$ligne = array("C1" => $row['ref'], "C2" => $row['ref_client'], "C3" => $row['nom'], "C4" => $row['firstname']." ".$row['lastname'], "C5" => $row['datec'],"C6" => $row['date_cloture'], "C7" => $row['total_ht'], "C8" => $type);
@@ -341,22 +365,40 @@ function calcul_tab_vente ($duree, $pdo)
 {
 	//statut 0 brouillon 1 valider 2 signé 3 perdu 4 facturé
 	$tableau =array(); 
-	$ligne = array("C1" => "Statut", "C2" => "Nombre", "C3" => "Montant HT");
+	$ligne = array("C1" => "Statut", "C2" => "Nombre", "C3" => "Montant HT", "C4" => "Marge nette €", "C5" => "Marge nette %");
 	array_push($tableau, $ligne);		
 	
-	//nombre et montant de proposition par utilisateur et par statut
+	//nombre et montant de proposition par statut
 	
 			
-	$sql= 	"SELECT COUNT(p.rowid), SUM(p.total_ht), p.fk_statut 
-			FROM llx_propal AS p
-			WHERE 	(".$duree."(p.datec)=".$duree."(NOW()) 
-					AND year(p.datec)=YEAR(NOW()) 
-					AND p.fk_statut <= 1 ) 
-					OR (".$duree."(p.date_cloture)=".$duree."(NOW()) 
-					AND year(p.date_cloture)=YEAR(NOW()) 
-					AND p.fk_statut > 1)
-			GROUP BY p.fk_statut";
-			
+	$sql= 	"SELECT COUNT(T.rowid),
+			SUM(T.total_ht),
+			T.fk_statut,
+			SUM(T.marge)
+			FROM (
+					SELECT DISTINCT Ta.rowid,
+									Ta.total_ht,
+									Ta.fk_statut,
+									SUM(Ta.m) as marge
+					FROM (
+							SELECT DISTINCT p.rowid,
+											p.total_ht,
+											p.fk_statut,
+											(llx_propaldet.total_ht-(llx_propaldet.buy_price_ht * llx_propaldet.qty)) AS m
+							FROM llx_propal AS p
+									LEFT JOIN llx_propaldet ON (llx_propaldet.fk_propal=p.rowid)
+									WHERE 	(".$duree."(p.datec)=".$duree."(NOW()) 
+											AND year(p.datec)=YEAR(NOW()) 
+											AND p.fk_statut <= 1) 
+											OR (".$duree."(p.date_cloture)=".$duree."(NOW()) 
+											AND year(p.date_cloture)=YEAR(NOW()) 
+											AND p.fk_statut > 1)
+						) AS Ta 
+					WHERE 1
+					GROUP BY Ta.rowid
+				) AS T
+			WHERE 1
+			GROUP BY fk_statut";
 	
 	foreach  ($pdo->query($sql) as $row) 
 	{
@@ -364,23 +406,28 @@ function calcul_tab_vente ($duree, $pdo)
 		switch ($row['fk_statut'])
 		{
 			case '0':
-				$ligne = array("C1" => "Brouillon", "C2" => $row['COUNT(p.rowid)'], "C3" => $row['SUM(p.total_ht)']);
+				if ($row['SUM(T.total_ht)']!= 0) $marge_tx = (($row['SUM(T.marge)']/$row['SUM(T.total_ht)'])*100);
+				$ligne = array("C1" => "Brouillon", "C2" => $row['COUNT(T.rowid)'], "C3" => $row['SUM(T.total_ht)'], "C4" => $row['SUM(T.marge)'], "C5" => $marge_tx);
 				array_push($tableau, $ligne);				
 			break;
 			case '1':
-				$ligne = array("C1" => "Validée", "C2" => $row['COUNT(p.rowid)'], "C3" => $row['SUM(p.total_ht)']);
+				if ($row['SUM(T.total_ht)']!= 0) $marge_tx = (($row['SUM(T.marge)']/$row['SUM(T.total_ht)'])*100);
+				$ligne = array("C1" => "Validée", "C2" => $row['COUNT(T.rowid)'], "C3" => $row['SUM(T.total_ht)'], "C4" => $row['SUM(T.marge)'], "C5" => $marge_tx);
 				array_push($tableau, $ligne);	
 			break;
 			case '2':
-				$ligne = array("C1" => "Signée", "C2" => $row['COUNT(p.rowid)'], "C3" => $row['SUM(p.total_ht)']);
+				if ($row['SUM(T.total_ht)']!= 0) $marge_tx = (($row['SUM(T.marge)']/$row['SUM(T.total_ht)'])*100);
+				$ligne = array("C1" => "Signée", "C2" => $row['COUNT(T.rowid)'], "C3" => $row['SUM(T.total_ht)'], "C4" => $row['SUM(T.marge)'], "C5" => $marge_tx);
 				array_push($tableau, $ligne);	
 			break;
 			case '4':
-				$ligne = array("C1" => "Facturée", "C2" => $row['COUNT(p.rowid)'], "C3" => $row['SUM(p.total_ht)']);
+				if ($row['SUM(T.total_ht)']!= 0) $marge_tx = (($row['SUM(T.marge)']/$row['SUM(T.total_ht)'])*100);
+				$ligne = array("C1" => "Facturée", "C2" => $row['COUNT(T.rowid)'], "C3" => $row['SUM(T.total_ht)'], "C4" => $row['SUM(T.marge)'], "C5" => $marge_tx);
 				array_push($tableau, $ligne);	
 			break;
 			case '3':
-				$ligne = array("C1" => "Perdue", "C2" => $row['COUNT(p.rowid)'], "C3" => $row['SUM(p.total_ht)']);
+				if ($row['SUM(T.total_ht)']!= 0) $marge_tx = (($row['SUM(T.marge)']/$row['SUM(T.total_ht)'])*100);
+				$ligne = array("C1" => "Perdue", "C2" => $row['COUNT(T.rowid)'], "C3" => $row['SUM(T.total_ht)'], "C4" => $row['SUM(T.marge)'], "C5" => $marge_tx);
 				array_push($tableau, $ligne);	
 			break;
 		}	
@@ -762,14 +809,40 @@ $sheet = $spreadsheet->createSheet();
 $sheet->setTitle('Liste devis gagnés');
 
 //->getColumnDimension('A')->setAutoSize(true);
-$sheet->getColumnDimension('A')->setWidth(100);		//largeur de colonne
+
+
+//$sheet->getColumnDimension('A')->setWidth(100);		//largeur de colonne
+
+
+Foreach (range('A','J') as $IDcolumn)
+{
+	$sheet->getColumnDimension($IDcolumn)->setAutoSize(true);		//largeur de colonne
+}
+
 //$sheet->mergeCells('A1:F1');		//fusion de cellules
 //$sheet->setCellValue('A1', "Liste des devis gagnés : ");
 
 $largeur_titre = 1;
-$nb_colonne = 8;
+$nb_colonne = 10;
 $i = 1;
 $my_tab = liste_devis_gagne ('YEAR', $pdo);
+
+//guits debug
+    	//$tt = dol_buildpath("/fichinter/card.php?id=".$object->id, 1);
+    	
+		$arr = get_defined_vars(); //affiche toutes les variables
+		ob_start(); 
+	
+
+		var_export($my_tab); 
+
+		$tab_debug=ob_get_contents(); 
+		ob_end_clean(); 
+		$fichier=fopen('tes_xls.log','w'); 
+		fwrite($fichier,$tab_debug); 
+		fclose($fichier); 
+		//guits debug fin
+
 print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, NULL);
 
 //$my_tab = calcul_tab_inter ('MONTH', $pdo);
@@ -806,22 +879,22 @@ $sheet->setCellValue('A1', "Statistiques commerciales du ".date('d')."/".date('m
 
 
 $my_tab = calcul_tab_vente ('WEEK', $pdo);
-print_tableau ($my_tab, $sheet, 'A', 4, 2, 3, "Ventes de la semaine");
+print_tableau ($my_tab, $sheet, 'A', 4, 2, 5, "Ventes de la semaine");
 
 $my_tab = calcul_tab_vente ('MONTH', $pdo);
-print_tableau ($my_tab, $sheet, 'F', 4, 2, 3, "Ventes du mois");
+print_tableau ($my_tab, $sheet, 'H', 4, 2, 5, "Ventes du mois");
 
 $my_tab = calcul_tab_vente ('YEAR', $pdo);
-print_tableau ($my_tab, $sheet, 'K', 4, 2, 3, "Ventes de l'année");
+print_tableau ($my_tab, $sheet, 'O', 4, 2, 5, "Ventes de l'année");
 
 $my_tab = calcul_tab_vente_user ('WEEK', $pdo);
 print_tableau ($my_tab, $sheet, 'A', 13, 2, 4, "Ventes de la semaine par utilisateur");
 
 $my_tab = calcul_tab_vente_user ('MONTH', $pdo);
-print_tableau ($my_tab, $sheet, 'G', 13, 2, 4, "Ventes du mois par utilisateur");
+print_tableau ($my_tab, $sheet, 'H', 13, 2, 4, "Ventes du mois par utilisateur");
 
 $my_tab = calcul_tab_vente_user ('YEAR', $pdo);
-print_tableau ($my_tab, $sheet, 'M', 13, 2, 4, "Ventes de l'année par utilisateur");
+print_tableau ($my_tab, $sheet, 'O', 13, 2, 4, "Ventes de l'année par utilisateur");
 
 
 
