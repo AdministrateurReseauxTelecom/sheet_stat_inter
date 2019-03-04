@@ -403,19 +403,38 @@ function calcul_tab_vente_user ($duree, $pdo)
 	//nombre et montant de proposition par utilisateur et par statut
 	
 			
-	$sql= 	"SELECT u.lastname, COUNT(p.rowid), SUM(p.total_ht), p.fk_statut 
-			FROM llx_user AS u, llx_propal AS p INNER JOIN llx_element_contact AS c ON p.rowid = c.element_id 
-			WHERE 	(u.rowid =c.fk_socpeople 
-					AND c.fk_c_type_contact=31
-					AND ".$duree."(p.datec)=".$duree."(NOW()) 
-					AND year(p.datec)=YEAR(NOW()) 
-					AND p.fk_statut <= 1 ) 
-					OR (u.rowid =c.fk_socpeople 
-					AND c.fk_c_type_contact=31
-					AND ".$duree."(p.date_cloture)=".$duree."(NOW()) 
-					AND year(p.date_cloture)=YEAR(NOW()) 
-					AND p.fk_statut > 1)
-			GROUP BY u.lastname, p.fk_statut";
+	$sql= 	"SELECT T.lastname, COUNT(T.rowid), SUM(T.total_ht), T.fk_statut 
+				FROM
+					(
+						
+				 (SELECT DISTINCT llx_user.lastname, llx_propal.rowid, llx_propal.total_ht, llx_propal.fk_statut 
+				 FROM llx_propal 
+						LEFT JOIN llx_propal_extrafields ON (llx_propal_extrafields.fk_object=llx_propal.rowid)
+						LEFT JOIN llx_societe ON (llx_societe.rowid=llx_propal.fk_soc)
+						LEFT JOIN llx_element_contact ON (llx_element_contact.element_id=llx_propal.rowid)
+						LEFT JOIN llx_user ON (llx_user.rowid=llx_element_contact.fk_socpeople)
+						WHERE (".$duree."(llx_propal.datec)=".$duree."(NOW())
+								AND llx_element_contact.fk_c_type_contact=31 
+								AND year(llx_propal.datec)=YEAR(NOW()) 
+								AND llx_propal.fk_statut <= 1 ) 
+								OR
+								(".$duree."(llx_propal.date_cloture)=".$duree."(NOW())
+								AND llx_element_contact.fk_c_type_contact=31
+								AND year(llx_propal.date_cloture)=YEAR(NOW()) 
+								AND llx_propal.fk_statut > 1))
+								
+				UNION
+
+				(SELECT DISTINCT llx_user.lastname, llx_propal.rowid, llx_propal.total_ht, llx_propal.fk_statut 
+								FROM llx_propal LEFT JOIN llx_user ON (llx_user.rowid=llx_propal.fk_user_author )
+								WHERE 	(".$duree."(llx_propal.datec)=".$duree."(NOW())
+									AND year(llx_propal.datec)=YEAR(NOW()) 
+									AND llx_propal.fk_statut <= 1 ) 
+									OR (".$duree."(llx_propal.date_cloture)=".$duree."(NOW())
+									AND year(llx_propal.date_cloture)=YEAR(NOW()) 
+									AND llx_propal.fk_statut > 1) )
+					)AS T
+				GROUP BY T.lastname, T.fk_statut";
 			
 	
 	foreach  ($pdo->query($sql) as $row) 
@@ -423,23 +442,23 @@ function calcul_tab_vente_user ($duree, $pdo)
 		switch ($row['fk_statut'])
 		{
 			case '0':
-				$ligne = array("C1" => $row['lastname'], "C2" => "Brouillon", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+				$ligne = array("C1" => $row['lastname'], "C2" => "Brouillon", "C3" => $row['COUNT(T.rowid)'], "C4" => $row['SUM(T.total_ht)']);
 				array_push($tableau, $ligne);				
 			break;
 			case '1':
-				$ligne = array("C1" => $row['lastname'], "C2" => "Validée", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+				$ligne = array("C1" => $row['lastname'], "C2" => "Validée", "C3" => $row['COUNT(T.rowid)'], "C4" => $row['SUM(T.total_ht)']);
 				array_push($tableau, $ligne);	
 			break;
 			case '2':
-				$ligne = array("C1" => $row['lastname'], "C2" => "Signée", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+				$ligne = array("C1" => $row['lastname'], "C2" => "Signée", "C3" => $row['COUNT(T.rowid)'], "C4" => $row['SUM(T.total_ht)']);
 				array_push($tableau, $ligne);	
 			break;
 			case '4':
-				$ligne = array("C1" => $row['lastname'], "C2" => "Facturée", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+				$ligne = array("C1" => $row['lastname'], "C2" => "Facturée", "C3" => $row['COUNT(T.rowid)'], "C4" => $row['SUM(T.total_ht)']);
 				array_push($tableau, $ligne);	
 			break;
 			case '3':
-				$ligne = array("C1" => $row['lastname'], "C2" => "Perdue", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+				$ligne = array("C1" => $row['lastname'], "C2" => "Perdue", "C3" => $row['COUNT(T.rowid)'], "C4" => $row['SUM(T.total_ht)']);
 				array_push($tableau, $ligne);	
 			break;
 		}	
@@ -733,14 +752,16 @@ print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, "Liste des
 $sheet = $spreadsheet->createSheet();
 $sheet->setTitle('Liste devis gagnés');
 
-$sheet->mergeCells('A1:F1');		//fusion de cellules
-$sheet->setCellValue('A1', "Liste des devis gagnés : ");
+//->getColumnDimension('A')->setAutoSize(true);
+$sheet->getColumnDimension('A')->setWidth(100);		//largeur de colonne
+//$sheet->mergeCells('A1:F1');		//fusion de cellules
+//$sheet->setCellValue('A1', "Liste des devis gagnés : ");
 
 $largeur_titre = 2;
 $nb_colonne = 8;
-$i = 3;
+$i = 1;
 $my_tab = liste_devis_gagne ('YEAR', $pdo);
-print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, "Liste des devis perdus");
+print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, "Liste des devis gagnés");
 
 //$my_tab = calcul_tab_inter ('MONTH', $pdo);
 //print_tableau ($my_tab, $sheet, 'E', $i, $largeur_titre, $nb_colonne, "Interventions du mois");
@@ -764,34 +785,34 @@ print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, "Liste des
 
 
 
-////CRéation de la feuille commerce
-//// CREATE A NEW SHEET + POPULATE DATA
+//CRéation de la feuille commerce
+// CREATE A NEW SHEET + POPULATE DATA
 
-//$sheet = $spreadsheet->createSheet();
-////$sheet = $spreadsheet->getActiveSheet();
-//$sheet->setTitle('Statistiques commerciales');
+$sheet = $spreadsheet->createSheet();
+//$sheet = $spreadsheet->getActiveSheet();
+$sheet->setTitle('Statistiques commerciales');
 
-//$sheet->mergeCells('A1:F1');		//fusion de cellules
-//$sheet->setCellValue('A1', "Statistiques commerciales du ".date('d')."/".date('m')."/".date('Y')." (semaine n°".date('W').")");
+$sheet->mergeCells('A1:F1');		//fusion de cellules
+$sheet->setCellValue('A1', "Statistiques commerciales du ".date('d')."/".date('m')."/".date('Y')." (semaine n°".date('W').")");
 
 
-//$my_tab = calcul_tab_vente ('WEEK', $pdo);
-//print_tableau ($my_tab, $sheet, 'A', 4, 2, 3, "Ventes de la semaine");
+$my_tab = calcul_tab_vente ('WEEK', $pdo);
+print_tableau ($my_tab, $sheet, 'A', 4, 2, 3, "Ventes de la semaine");
 
-//$my_tab = calcul_tab_vente ('MONTH', $pdo);
-//print_tableau ($my_tab, $sheet, 'F', 4, 2, 3, "Ventes du mois");
+$my_tab = calcul_tab_vente ('MONTH', $pdo);
+print_tableau ($my_tab, $sheet, 'F', 4, 2, 3, "Ventes du mois");
 
-//$my_tab = calcul_tab_vente ('YEAR', $pdo);
-//print_tableau ($my_tab, $sheet, 'K', 4, 2, 3, "Ventes de l'année");
+$my_tab = calcul_tab_vente ('YEAR', $pdo);
+print_tableau ($my_tab, $sheet, 'K', 4, 2, 3, "Ventes de l'année");
 
-//$my_tab = calcul_tab_vente_user ('WEEK', $pdo);
-//print_tableau ($my_tab, $sheet, 'A', 13, 2, 4, "Ventes de la semaine par utilisateur");
+$my_tab = calcul_tab_vente_user ('WEEK', $pdo);
+print_tableau ($my_tab, $sheet, 'A', 13, 2, 4, "Ventes de la semaine par utilisateur");
 
-//$my_tab = calcul_tab_vente_user ('MONTH', $pdo);
-//print_tableau ($my_tab, $sheet, 'G', 13, 2, 4, "Ventes du mois par utilisateur");
+$my_tab = calcul_tab_vente_user ('MONTH', $pdo);
+print_tableau ($my_tab, $sheet, 'G', 13, 2, 4, "Ventes du mois par utilisateur");
 
-//$my_tab = calcul_tab_vente_user ('YEAR', $pdo);
-//print_tableau ($my_tab, $sheet, 'M', 13, 2, 4, "Ventes de l'année par utilisateur");
+$my_tab = calcul_tab_vente_user ('YEAR', $pdo);
+print_tableau ($my_tab, $sheet, 'M', 13, 2, 4, "Ventes de l'année par utilisateur");
 
 
 
