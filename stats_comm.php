@@ -659,99 +659,72 @@ function calcul_tab_vente_categ ($duree, $pdo)
 	array_push($tableau, $ligne);		
 	
 	//nombre et montant de proposition par catégorie et par statut
-	//requete a revoir!!!!
-			
-	$sql= 	"SELECT x.ztypepresta, COUNT(p.rowid), SUM(p.total_ht), p.fk_statut 
-			FROM llx_propal_extrafields AS x, llx_propal AS p
-			WHERE 	(x.fk_object =p.rowid
-					AND ".$duree."(p.date_cloture)=".$duree."(NOW()) 
-					AND year(p.date_cloture)=YEAR(NOW()) 
-					AND p.fk_statut > 1)
-					OR
-					(x.fk_object =p.rowid
-					AND ".$duree."(p.datec)=".$duree."(NOW()) 
-					AND year(p.datec)=YEAR(NOW()) 
-					AND p.fk_statut <= 1 )
-			GROUP BY x.ztypepresta, p.fk_statut";
-			
-			
-			
-	
-	foreach  ($pdo->query($sql) as $row) 
-	{
-		
-		
 
-		
-		switch ($row['ztypepresta'])
-		{
-			case '1':
-				$typepresta = "Habitat";
-			break;
-			case '2':
-				$typepresta = "Tertiaire";	
-			break;
-			case '3':
-				$typepresta = "Alarme intrusion";	
-			break;
-			case '4':
-				$typepresta = "Alarme SSI";	
-			break;
-			case '5':
-				$typepresta = "Cablage";	
-			break;
-			case '6':
-				$typepresta = "Controle d'acces";	
-			break;
-			case '7':
-				$typepresta = "GTC";	
-			break;
-			case '8':
-				$typepresta = "Interphonie";	
-			break;
-			case '9':
-				$typepresta = "Telephonie";	
-			break;
-			case '10':
-				$typepresta = "TV";	
-			break;
-			case '11':
-				$typepresta = "VDI";	
-			break;
-			case '12':
-				$typepresta = "Vidéoprotection";	
-			break;
-			case '13':
-				$typepresta = "Wifi";	
-			break;
-		}
-		
-		switch ($row['fk_statut'])
-		{
-			case '0':
-				$ligne = array("C1" => $typepresta, "C2" => "Brouillon", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
-				array_push($tableau, $ligne);				
-			break;
-			case '1':
-				$ligne = array("C1" => $typepresta, "C2" => "Validée", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
-				array_push($tableau, $ligne);	
-			break;
-			case '2':
-				$ligne = array("C1" => $typepresta, "C2" => "Signée", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
-				array_push($tableau, $ligne);	
-			break;
-			case '4':
-				$ligne = array("C1" => $typepresta, "C2" => "Facturée", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
-				array_push($tableau, $ligne);	
-			break;
-			case '3':
-				$ligne = array("C1" => $typepresta, "C2" => "Perdue", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
-				array_push($tableau, $ligne);	
-			break;
-		}	
-	
-	}
+	$tab_type = array (	1 => "Habitat",
+						2 => "Tertiaire",
+						3 => "Alarme intrusion",
+						4 => "Alarme SSI",
+						5 => "Cablage",
+						6 => "Contôle d'accès",
+						7 => "GTC",
+						8 => "Interphonie",
+						9 => "Telephonie",
+						10 => "TV",
+						11 => "VDI",
+						12 => "Videoprotection",
+						13 => "Wifi",
+						14 => "IPTV",
+						15 => "AFF.Dynamique");
+	$n = 1;
+	While ($n <= 15)
+	{
 			
+		$sql = 	"SELECT COUNT(p.rowid), SUM(p.total_ht), p.fk_statut 
+				FROM llx_propal_extrafields AS x, llx_propal AS p
+				WHERE 	(x.fk_object =p.rowid
+						AND ".$duree."(p.date_cloture)=".$duree."(NOW())  
+						AND year(p.date_cloture)=YEAR(NOW()) 
+						AND p.fk_statut > 1
+						AND x.ztypepresta = ".$n.")
+						OR
+						(x.fk_object =p.rowid
+						AND ".$duree."(p.datec)=".$duree."(NOW()) 
+						AND year(p.datec)=YEAR(NOW()) 
+						AND p.fk_statut <= 1 
+						AND x.ztypepresta = ".$n.")
+				 GROUP BY p.fk_statut";
+							
+			
+	
+		foreach ($pdo->query($sql) as $row) 
+		{
+			switch ($row['fk_statut'])
+			{
+				case '0':
+					$ligne = array("C1" => $tab_type[$n], "C2" => "Brouillon", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+					array_push($tableau, $ligne);				
+				break;
+				case '1':
+					$ligne = array("C1" => $tab_type[$n], "C2" => "Validée", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+					array_push($tableau, $ligne);	
+				break;
+				case '2':
+					$ligne = array("C1" => $tab_type[$n], "C2" => "Signée", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+					array_push($tableau, $ligne);	
+				break;
+				case '4':
+					$ligne = array("C1" => $tab_type[$n], "C2" => "Facturée", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+					array_push($tableau, $ligne);	
+				break;
+				case '3':
+					$ligne = array("C1" => $tab_type[$n], "C2" => "Perdue", "C3" => $row['COUNT(p.rowid)'], "C4" => $row['SUM(p.total_ht)']);
+					array_push($tableau, $ligne);	
+				break;
+			}	
+		
+		}
+		$n++;
+	}		
 	return $tableau;	
 }
 
@@ -816,6 +789,7 @@ function print_tableau ($tableau, $sheet, $C1, $i, $largeur_1, $nbcolonne, $titr
 		$sheet->getStyle($C3.$i)->getBorders()->getRight()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
 		$i++;
 	}
+	return $i;
 }
 
 
@@ -827,7 +801,11 @@ $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Liste devis validés');
 
 
-$sheet->setAutoFilter('A1:G1000');
+Foreach (range('A','G') as $IDcolumn)
+{
+	$sheet->getColumnDimension($IDcolumn)->setAutoSize(true);		//largeur de colonne
+}
+
 
 //$sheet->mergeCells('A1:F1');		//fusion de cellules
 //$sheet->setCellValue('A1', "Statistiques interventions du ".date('d')."/".date('m')."/".date('Y')." (semaine n°".date('W').")");
@@ -851,26 +829,32 @@ $largeur_titre = 1;
 $nb_colonne = 9;
 $i = 1;
 $my_tab = liste_devis_ouvert ($pdo);
-print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, NULL);
+$i_fin = print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, NULL);
+$sheet->setAutoFilter('A'.$i.':J'.$i_fin);
 
 ////Crétation du fichier et feuille commerciale perdu		
 //// CREATE A NEW SPREADSHEET + POPULATE DATA
 $sheet = $spreadsheet->createSheet();
-$sheet->setTitle('Liste devis perdus');
+$sheet->setTitle('Liste devis perdus cette année');
 
-$sheet->mergeCells('A1:F1');		//fusion de cellules
-$sheet->setCellValue('A1', "Liste des devis perdus : ");
+Foreach (range('A','J') as $IDcolumn)
+{
+	$sheet->getColumnDimension($IDcolumn)->setAutoSize(true);		//largeur de colonne
+}
+
+//$sheet->mergeCells('A1:F1');		//fusion de cellules
+//$sheet->setCellValue('A1', "Liste des devis perdus : ");
 
 $largeur_titre = 2;
 $nb_colonne = 8;
-$i = 3;
+$i = 1;
 $my_tab = liste_devis_perdu ('YEAR', $pdo);
-print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, "Liste des devis perdus");
-
+$i_fin = print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, NULL);
+$sheet->setAutoFilter('A'.$i.':J'.$i_fin);
 ////Crétation du fichier et feuille commerciale gagnes		
 //// CREATE A NEW SPREADSHEET + POPULATE DATA
 $sheet = $spreadsheet->createSheet();
-$sheet->setTitle('Liste devis gagnés');
+$sheet->setTitle('Liste devis gagnés cette année');
 
 //->getColumnDimension('A')->setAutoSize(true);
 
@@ -891,24 +875,10 @@ $nb_colonne = 10;
 $i = 1;
 $my_tab = liste_devis_gagne ('YEAR', $pdo);
 
-//guits debug
-    	//$tt = dol_buildpath("/fichinter/card.php?id=".$object->id, 1);
-    	
-		$arr = get_defined_vars(); //affiche toutes les variables
-		ob_start(); 
-	
 
-		var_export($my_tab); 
 
-		$tab_debug=ob_get_contents(); 
-		ob_end_clean(); 
-		$fichier=fopen('tes_xls.log','w'); 
-		fwrite($fichier,$tab_debug); 
-		fclose($fichier); 
-		//guits debug fin
-
-print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, NULL);
-
+$i_fin = print_tableau ($my_tab, $sheet, 'A', $i, $largeur_titre, $nb_colonne, NULL);
+$sheet->setAutoFilter('A'.$i.':J'.$i_fin);
 
 
 //// after data is filled into 
@@ -980,31 +950,31 @@ print_tableau ($my_tab, $sheet, 'Q', 13, 2, 6, "Devis de l'année par utilisateu
 
 
 
-//$sheet = $spreadsheet->createSheet();
-////$sheet = $spreadsheet->getActiveSheet();
-//$sheet->setTitle('Statistiques commerciales suite');
+$sheet = $spreadsheet->createSheet();
+//$sheet = $spreadsheet->getActiveSheet();
+$sheet->setTitle('Statistiques commerciales suite');
 
-//$sheet->mergeCells('A1:F1');		//fusion de cellules
-//$sheet->setCellValue('A1', "Statistiques commerciales suite du ".date('d')."/".date('m')."/".date('Y')." (semaine n°".date('W').")");
+$sheet->mergeCells('A1:F1');		//fusion de cellules
+$sheet->setCellValue('A1', "Statistiques commerciales suite du ".date('d')."/".date('m')."/".date('Y')." (semaine n°".date('W').")");
 
 
-//$my_tab = calcul_tab_vente_agence ('WEEK', $pdo);
-//print_tableau ($my_tab, $sheet, 'A', 4, 2, 3, "Ventes par de la semaine par agence");
+$my_tab = calcul_tab_vente_agence ('WEEK', $pdo);
+print_tableau ($my_tab, $sheet, 'A', 4, 2, 3, "Ventes par de la semaine par agence");
 
-//$my_tab = calcul_tab_vente_agence ('MONTH', $pdo);
-//print_tableau ($my_tab, $sheet, 'F', 4, 2, 3, "Ventes du mois par agence");
+$my_tab = calcul_tab_vente_agence ('MONTH', $pdo);
+print_tableau ($my_tab, $sheet, 'F', 4, 2, 3, "Ventes du mois par agence");
 
-//$my_tab = calcul_tab_vente_agence ('YEAR', $pdo);
-//print_tableau ($my_tab, $sheet, 'K', 4, 2, 3, "Ventes de l'année par agence");
+$my_tab = calcul_tab_vente_agence ('YEAR', $pdo);
+print_tableau ($my_tab, $sheet, 'K', 4, 2, 3, "Ventes de l'année par agence");
 
-//$my_tab = calcul_tab_vente_categ ('WEEK', $pdo);
-//print_tableau ($my_tab, $sheet, 'A', 13, 2, 4, "Ventes de la semaine par type de prestation");
+$my_tab = calcul_tab_vente_categ ('WEEK', $pdo);
+print_tableau ($my_tab, $sheet, 'A', 17, 2, 4, "Ventes de la semaine par type de prestation");
 
-//$my_tab = calcul_tab_vente_categ ('MONTH', $pdo);
-//print_tableau ($my_tab, $sheet, 'G', 13, 2, 4, "Ventes du mois par type de prestation");
+$my_tab = calcul_tab_vente_categ ('MONTH', $pdo);
+print_tableau ($my_tab, $sheet, 'G', 17, 2, 4, "Ventes du mois par type de prestation");
 
-//$my_tab = calcul_tab_vente_categ ('YEAR', $pdo);
-//print_tableau ($my_tab, $sheet, 'M', 13, 2, 4, "Ventes de l'année par type de prestation");
+$my_tab = calcul_tab_vente_categ ('YEAR', $pdo);
+print_tableau ($my_tab, $sheet, 'M', 17, 2, 4, "Ventes de l'année par type de prestation");
 
 
 
@@ -1020,9 +990,9 @@ $spreadsheet->getProperties()
 $writer = new Xlsx($spreadsheet);
 
 
-
+//Permet de limiter la largeur maxi des colonnes
 // after data is filled into 
-$maxWidth = 50;
+$maxWidth = 35;
 foreach ($spreadsheet->getAllSheets() as $sheet) {
     $sheet->calculateColumnWidths();
     foreach ($sheet->getColumnDimensions() as $colDim) {
@@ -1061,7 +1031,21 @@ $writer->save(gmdate('Ymd')."_Stats_comm_.xlsx");
 //$writer->save('php://output');
 
 
+////guits debug
+    	////$tt = dol_buildpath("/fichinter/card.php?id=".$object->id, 1);
+    	
+		//$arr = get_defined_vars(); //affiche toutes les variables
+		//ob_start(); 
+	
 
+		//var_export($my_tab); 
+
+		//$tab_debug=ob_get_contents(); 
+		//ob_end_clean(); 
+		//$fichier=fopen('tes_xls.log','w'); 
+		//fwrite($fichier,$tab_debug); 
+		//fclose($fichier); 
+		////guits debug fin
 
 
 
