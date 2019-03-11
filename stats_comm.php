@@ -498,8 +498,8 @@ function calcul_tab_vente_user ($duree, $pdo)
                             FROM
                                 (
 
-                             (SELECT DISTINCT	llx_user.lastname,
-                                                llx_propal.rowid,
+                             (SELECT DISTINCT	llx_propal.rowid,
+												llx_user.lastname,
                                                 llx_propal.total_ht,
                                                 llx_propal.fk_statut,
                                                 (llx_propaldet.total_ht-(llx_propaldet.buy_price_ht * llx_propaldet.qty)) AS m
@@ -518,27 +518,45 @@ function calcul_tab_vente_user ($duree, $pdo)
 											AND llx_element_contact.fk_c_type_contact=31
                                             AND year(llx_propal.date_cloture)=YEAR(NOW()) 
                                             AND llx_propal.fk_statut > 1))
-
+                                
                             UNION
 
-                            (SELECT DISTINCT	llx_user.lastname,
-                                                llx_propal.rowid,
+                            (SELECT DISTINCT	llx_propal.rowid,
+												llx_user.lastname,
                                                 llx_propal.total_ht,
                                                 llx_propal.fk_statut,
                                                 (llx_propaldet.total_ht-(llx_propaldet.buy_price_ht * llx_propaldet.qty)) AS m
                                             FROM	llx_propal
                                                     LEFT JOIN llx_user ON (llx_user.rowid=llx_propal.fk_user_author )
                                                     LEFT JOIN llx_propaldet ON (llx_propaldet.fk_propal=llx_propal.rowid)
-                                            WHERE 	(".$duree."(llx_propal.datec)=".$duree."(NOW()) 
+                                            WHERE ((".$duree."(llx_propal.datec)=".$duree."(NOW()) 
 												AND year(llx_propal.datec)=YEAR(NOW()) 
                                                 AND llx_propal.fk_statut <= 1 ) 
                                                 OR 
                                                 (".$duree."(llx_propal.date_cloture)=".$duree."(NOW()) 
 												AND year(llx_propal.date_cloture)=YEAR(NOW()) 
                                                 AND llx_propal.fk_statut > 1))
-                                )AS Ta
+                               					AND llx_propal.rowid NOT IN ((SELECT DISTINCT	llx_propal.rowid
+                             FROM llx_propal 
+                                    LEFT JOIN llx_propal_extrafields ON (llx_propal_extrafields.fk_object=llx_propal.rowid)
+                                    LEFT JOIN llx_societe ON (llx_societe.rowid=llx_propal.fk_soc)
+                                    LEFT JOIN llx_element_contact ON (llx_element_contact.element_id=llx_propal.rowid)
+                                    LEFT JOIN llx_user ON (llx_user.rowid=llx_element_contact.fk_socpeople)
+                                    LEFT JOIN llx_propaldet ON (llx_propaldet.fk_propal=llx_propal.rowid)
+                                    WHERE (".$duree."(llx_propal.datec)=".$duree."(NOW()) 
+											AND llx_element_contact.fk_c_type_contact=31 
+                                            AND year(llx_propal.datec)=YEAR(NOW()) 
+                                            AND llx_propal.fk_statut <= 1 ) 
+                                            OR
+                                            (".$duree."(llx_propal.date_cloture)=".$duree."(NOW()) 
+											AND llx_element_contact.fk_c_type_contact=31
+                                            AND year(llx_propal.date_cloture)=YEAR(NOW()) 
+                                            AND llx_propal.fk_statut > 1)))
+
+                                                                                               
+                                ))AS Ta
                             GROUP BY Ta.rowid, Ta.lastname, Ta.fk_statut, Ta.total_ht
-              				)AS T
+                            )AS T
                             WHERE 1
 			GROUP BY T.lastname, T.fk_statut";
 			
@@ -928,24 +946,56 @@ $sheet->setTitle('Statistiques commerciales');
 $sheet->mergeCells('A1:F1');		//fusion de cellules
 $sheet->setCellValue('A1', "Statistiques commerciales du ".date('d')."/".date('m')."/".date('Y')." (semaine n°".date('W').")");
 
+Foreach (range('A','T') as $IDcolumn)
+{
+	$sheet->getColumnDimension($IDcolumn)->setAutoSize(true);		//largeur de colonne
+}
+
 
 $my_tab = calcul_tab_vente ('WEEK', $pdo);
-print_tableau ($my_tab, $sheet, 'A', 4, 2, 5, "Devis de la semaine");
+$i = 4;
+$i_fin = print_tableau ($my_tab, $sheet, 'A', $i, 1, 5, "Devis de la semaine");
+
+//$sheet->setAutoFilter('A'.($i+1).':E'.$i_fin);
 
 $my_tab = calcul_tab_vente ('MONTH', $pdo);
-print_tableau ($my_tab, $sheet, 'I', 4, 2, 5, "Devis du mois");
+$i_fin = print_tableau ($my_tab, $sheet, 'H', $i, 1, 5, "Devis du mois");
+//$sheet->SetCellValue(A1, 'formule'); pour test SUM
+//$sheet->setAutoFilter('H'.($i+1).':L'.$i_fin);
 
 $my_tab = calcul_tab_vente ('YEAR', $pdo);
-print_tableau ($my_tab, $sheet, 'Q', 4, 2, 5, "Devis de l'année");
+$i_fin = print_tableau ($my_tab, $sheet, 'O', $i, 1, 5, "Devis de l'année");
+//guits debug
+    	//$tt = dol_buildpath("/fichinter/card.php?id=".$object->id, 1);
+    	
+		$arr = get_defined_vars(); //affiche toutes les variables
+		ob_start(); 
+	
 
+		var_export($i_fin); 
+
+		$tab_debug=ob_get_contents(); 
+		ob_end_clean(); 
+		$fichier=fopen('tes_xls.log','w'); 
+		fwrite($fichier,$tab_debug); 
+		fclose($fichier); 
+		//guits debug fin
+//$sheet->setAutoFilter('O'.($i+1).':S'.$i_fin);
+
+$i =13;
 $my_tab = calcul_tab_vente_user ('WEEK', $pdo);
-print_tableau ($my_tab, $sheet, 'A', 13, 2, 6, "Devis de la semaine par utilisateur");
+$i_fin = print_tableau ($my_tab, $sheet, 'A', $i, 1, 6, "Devis de la semaine par utilisateur");
+//$sheet->setAutoFilter('A'.($i+1).':F'.$i_fin);
 
 $my_tab = calcul_tab_vente_user ('MONTH', $pdo);
-print_tableau ($my_tab, $sheet, 'I', 13, 2, 6, "Devis du mois par utilisateur");
+$i_fin1 = print_tableau ($my_tab, $sheet, 'H', $i, 1, 6, "Devis du mois par utilisateur");
+
+//$sheet->setAutoFilter('H'.($i+1).':M'.$i_fin);
 
 $my_tab = calcul_tab_vente_user ('YEAR', $pdo);
-print_tableau ($my_tab, $sheet, 'Q', 13, 2, 6, "Devis de l'année par utilisateur");
+$i_fin = print_tableau ($my_tab, $sheet, 'O', $i, 1, 6, "Devis de l'année par utilisateur");
+//$sheet->setAutoFilter('O'.($i+1).':T'.$i_fin);
+//$sheet->setAutoFilter('H'.($i+1).':M'.$i_fin1,'O'.($i+1).':T'.$i_fin);
 
 
 
@@ -1031,21 +1081,7 @@ $writer->save(gmdate('Ymd')."_Stats_comm_.xlsx");
 //$writer->save('php://output');
 
 
-////guits debug
-    	////$tt = dol_buildpath("/fichinter/card.php?id=".$object->id, 1);
-    	
-		//$arr = get_defined_vars(); //affiche toutes les variables
-		//ob_start(); 
-	
 
-		//var_export($my_tab); 
-
-		//$tab_debug=ob_get_contents(); 
-		//ob_end_clean(); 
-		//$fichier=fopen('tes_xls.log','w'); 
-		//fwrite($fichier,$tab_debug); 
-		//fclose($fichier); 
-		////guits debug fin
 
 
 
